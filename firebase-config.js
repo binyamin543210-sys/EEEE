@@ -1,5 +1,4 @@
-
-// Firebase config – מותאם לדפדפן (compat)
+// Firebase config – מוכן לדפדפן (compat)
 const firebaseConfig = {
   apiKey: "AIzaSyCa808qwjJ8bayhjkTqZ8P9fRhfgi19xtY",
   authDomain: "bnapp-ddcbf.firebaseapp.com",
