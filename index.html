@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>BNAPP Calendar – בנימין & ננה</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Firebase compat SDKs (אל תגע בשורות האלו) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <!-- SunCalc לחישוב זמני שקיעה / זריחה בעת הצורך -->
+  <script src="https://unpkg.com/suncalc@1.9.0/suncalc.js"></script>
+</head>
+<body class="dark">
+  <div id="app">
+    <header class="app-shell">
+      <div class="app-shell-bg"></div>
+      <div class="app-shell-inner compact">
+        <div class="brand-block">
+          <div class="brand-title">BNAPP Calendar</div>
+          <div class="brand-subtitle">בנימין &amp; ננה</div>
+        </div>
+        <div class="header-tools">
+          <button id="freeTimeBtn" class="chip ghost">🕰 זמן חופשי</button>
+          <button id="tasksBtn" class="chip ghost">📋 משימות</button>
+          <button id="searchBtn" class="chip ghost">🔍 חיפוש</button>
+          <button id="weatherDayBtn" class="chip ghost">🌤 מזג אוויר</button>
+          <button id="cityBtn" class="chip ghost">🌍 עיר</button>
+          <label class="theme-toggle">
+            <span>לילה</span>
+            <input type="checkbox" id="themeToggle" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="month-hero slim">
+        <div class="month-hero-main">
+          <div id="gregorianHeader" class="month-hero-greg"></div>
+          <div id="hebrewHeader" class="month-hero-hebrew"></div>
+          <div class="month-hero-meta">
+            <span id="locationLabel">יבנה, ישראל</span>
+            <span class="dot-sep"></span>
+            <span id="todayLabel"></span>
+          </div>
+        </div>
+        <div class="month-hero-nav">
+          <button id="prevMonthBtn" class="nav-pill">
+            <span class="icon">&#x25B6;</span>
+            <span>חודש קודם</span>
+          </button>
+          <button id="todayBtn" class="nav-pill ghost">היום</button>
+          <button id="nextMonthBtn" class="nav-pill">
+            <span>חודש הבא</span>
+            <span class="icon">&#x25C0;</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="calendar-panel card">
+        <div class="calendar-header-row">
+          <div class="weekday-row">
+            <div>ראשון</div>
+            <div>שני</div>
+            <div>שלישי</div>
+            <div>רביעי</div>
+            <div>חמישי</div>
+            <div>שישי</div>
+            <div>שבת</div>
+          </div>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </section>
+    </main>
+
+    <!-- Day details modal -->
+    <div id="dayModal" class="modal hidden">
+      <div class="modal-content wide">
+        <button class="close-btn" data-close="dayModal">&times;</button>
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <div id="dayModalHebrew" class="modal-day-hebrew"></div>
+            <div id="dayModalGreg" class="modal-day-greg"></div>
+            <div id="dayModalHoliday" class="modal-day-holiday"></div>
+          </div>
+          <div class="modal-header-right">
+            <div id="dayWeatherInline" class="day-weather-inline big"></div>
+          </div>
+        </div>
+        <div id="dayShabbatInfo" class="shabbat-info"></div>
+        <div class="day-layout">
+          <div class="hours-column" id="hoursColumn"></div>
+          <div class="events-column">
+            <div class="events-header">
+              <h3>אירועים ומשימות</h3>
+              <button id="addEventFromDayBtn" class="btn tiny primary-soft">
+                + אירוע/משימה ליום זה
+              </button>
+            </div>
+            <div id="dayEventsList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Event editor modal -->
+    <div id="eventModal" class="modal hidden">
+      <div class="modal-content narrow">
+        <button class="close-btn" data-close="eventModal">&times;</button>
+        <div class="modal-header">
+          <h2 id="eventModalTitle">אירוע חדש</h2>
+        </div>
+        <form id="eventForm" class="form">
+          <label class="field">
+            <span>כותרת</span>
+            <input type="text" id="eventTitle" required />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>תאריך</span>
+              <input type="date" id="eventDate" required />
+            </label>
+            <label class="field">
+              <span>שעת התחלה</span>
+              <input type="time" id="eventStart" required />
+            </label>
+            <label class="field">
+              <span>שעת סיום</span>
+              <input type="time" id="eventEnd" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>כתובת (לא חובה)</span>
+            <input type="text" id="eventAddress" placeholder="רחוב, מספר, עיר..." />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>סוג</span>
+              <select id="eventKind">
+                <option value="event">אירוע</option>
+                <option value="task">משימה</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>שייך ל</span>
+              <select id="eventOwner">
+                <option value="benjamin">בנימין</option>
+                <option value="nana">ננה</option>
+                <option value="both">משותף</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="field-row align-center">
+            <label class="field checkbox-inline">
+              <input type="checkbox" id="eventNotify" checked />
+              <span>התראה</span>
+            </label>
+
+            <label class="field">
+              <span>כמה זמן מראש (דקות)</span>
+              <select id="eventNotifyMinutes">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+                <option value="60" selected>60</option>
+                <option value="90">90</option>
+                <option value="120">120</option>
+                <option value="180">180</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn primary">שמור</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Free time modal -->
+    <div id="freeTimeModal" class="modal hidden">
+      <div class="modal-content narrow">
+        <button class="close-btn" data-close="freeTimeModal">&times;</button>
+        <div class="modal-header">
+          <h2>זמן חופשי ליום</h2>
+        </div>
+        <div id="freeTimeContent"></div>
+      </div>
+    </div>
+
+    <!-- Tasks modal -->
+    <div id="tasksModal" class="modal hidden">
+      <div class="modal-content narrow">
+        <button class="close-btn" data-close="tasksModal">&times;</button>
+        <div class="modal-header">
+          <h2>משימות בחודש הקרוב</h2>
+        </div>
+        <div id="tasksContent"></div>
+      </div>
+    </div>
+
+    <!-- Weather modal -->
+    <div id="weatherModal" class="modal hidden">
+      <div class="modal-content narrow">
+        <button class="close-btn" data-close="weatherModal">&times;</button>
+        <div class="modal-header">
+          <h2>🌤 מזג אוויר – תצוגת חדשות</h2>
+        </div>
+        <div id="weatherContent" class="weather-modal-body">טוען...</div>
+      </div>
+    </div>
+
+    <!-- City select modal -->
+    <div id="cityModal" class="modal hidden">
+      <div class="modal-content narrow">
+        <button class="close-btn" data-close="cityModal">&times;</button>
+        <div class="modal-header">
+          <h2>בחירת עיר</h2>
+        </div>
+        <div class="form">
+          <label class="field">
+            <span>חפש עיר בכל העולם</span>
+            <input type="text" id="citySearchInput" placeholder="לדוגמה: Holon, Jerusalem, New York..." />
+          </label>
+          <button id="citySearchBtn" class="btn primary-soft">חפש</button>
+          <div id="citySearchStatus" class="hint"></div>
+          <div id="cityResults" class="city-results"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search modal -->
+    <div id="searchModal" class="modal hidden">
+      <div class="modal-content narrow">
+        <button class="close-btn" data-close="searchModal">&times;</button>
+        <div class="modal-header">
+          <h2>חיפוש אירוע / משימה</h2>
+        </div>
+        <div class="form">
+          <label class="field">
+            <span>מה לחפש?</span>
+            <input type="text" id="searchQuery" placeholder="לדוגמה: רופא, קניות, עבודה..." />
+          </label>
+          <button id="searchRunBtn" class="btn primary-soft">חפש</button>
+          <div id="searchStatus" class="hint"></div>
+          <div id="searchResults" class="search-results"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "BNAPP Calendar",
+  "short_name": "BNAPP Cal",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050611",
+  "theme_color": "#050611",
+  "icons": []
+}
